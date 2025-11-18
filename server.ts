@@ -1,7 +1,25 @@
 // Deno Deploy WebSocket Server mit Static File Serving
+// Type Definitions
+interface Client {
+  id: string;
+  name: string;
+  ws: WebSocket;
+  lobbyId?: string;
+}
 
-const clients = new Map(); // websocket -> { id, name, lobbyId }
-const lobbies = new Map(); // lobbyId -> { id, creator, players, started, words }
+interface Lobby {
+  id: string;
+  creator: string;
+  players: Client[];
+  started: boolean;
+  words: Map<string, string>;
+}
+
+const clients = new Map<WebSocket, Client>();
+const lobbies = new Map<string, Lobby>();
+
+
+
 
 // Generiere zufällige Lobby ID
 function generateLobbyId() {
@@ -68,7 +86,7 @@ function removePlayerFromLobby(ws: WebSocket) {
     });
   }
 
-  client.lobbyId = null;
+  client.lobbyId = undefined;
 }
 
 // WebSocket Handler
