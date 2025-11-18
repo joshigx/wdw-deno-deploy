@@ -1,4 +1,5 @@
 // Deno Deploy WebSocket Server mit Static File Serving
+
 // Type Definitions
 interface Client {
   id: string;
@@ -18,15 +19,12 @@ interface Lobby {
 const clients = new Map<WebSocket, Client>();
 const lobbies = new Map<string, Lobby>();
 
-
-
-
 // Generiere zufällige Lobby ID
 function generateLobbyId() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let id;
   do {
-    id = "";
+    id = '';
     for (let i = 0; i < 6; i++) {
       id += chars[Math.floor(Math.random() * chars.length)];
     }
@@ -35,22 +33,18 @@ function generateLobbyId() {
 }
 
 // Sende Nachricht an einen Client
-function sendToClient(ws: WebSocket, data: any) {
+function sendToClient(ws: WebSocket, data: Record<string, unknown>) {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
   }
 }
 
 // Sende Nachricht an alle Clients in einer Lobby
-function sendToLobby(
-  lobbyId: string,
-  data: any,
-  excludeWs: WebSocket | null = null,
-) {
+function sendToLobby(lobbyId: string, data: Record<string, unknown>, excludeWs: WebSocket | null = null) {
   const lobby = lobbies.get(lobbyId);
   if (!lobby) return;
 
-  lobby.players.forEach((player: any) => {
+  lobby.players.forEach((player: Client) => {
     if (player.ws !== excludeWs) {
       sendToClient(player.ws, data);
     }
@@ -66,7 +60,7 @@ function removePlayerFromLobby(ws: WebSocket) {
   if (!lobby) return;
 
   // Entferne Spieler aus der Liste
-  lobby.players = lobby.players.filter((p: any) => p.ws !== ws);
+  lobby.players = lobby.players.filter((p: Client) => p.ws !== ws);
 
   // Wenn Lobby leer ist, lösche sie
   if (lobby.players.length === 0) {
@@ -79,10 +73,10 @@ function removePlayerFromLobby(ws: WebSocket) {
 
     // Informiere andere Spieler
     sendToLobby(client.lobbyId, {
-      type: "playerLeft",
+      type: 'playerLeft',
       playerId: client.id,
-      players: lobby.players.map((p: any) => ({ id: p.id, name: p.name })),
-      creator: lobby.creator,
+      players: lobby.players.map((p: Client) => ({ id: p.id, name: p.name })),
+      creator: lobby.creator
     });
   }
 
@@ -95,7 +89,7 @@ function handleWebSocket(ws: WebSocket) {
 
   ws.onopen = () => {
     console.log(`Client ${clientId} connected`);
-    sendToClient(ws, { type: "connected", clientId });
+    sendToClient(ws, { type: 'connected', clientId });
   };
 
   ws.onmessage = (event) => {
@@ -104,13 +98,13 @@ function handleWebSocket(ws: WebSocket) {
       console.log(`Received from ${clientId}:`, data);
 
       switch (data.type) {
-        case "setName": {
+        case 'setName': {
           clients.set(ws, { id: clientId, name: data.name, ws });
-          sendToClient(ws, { type: "nameSet", success: true });
+          sendToClient(ws, { type: 'nameSet', success: true });
           break;
         }
 
-        case "createLobby": {
+        case 'createLobby': {
           const client = clients.get(ws);
           if (!client) return;
 
@@ -120,36 +114,33 @@ function handleWebSocket(ws: WebSocket) {
             creator: clientId,
             players: [client],
             started: false,
-            words: new Map(),
+            words: new Map()
           };
 
           lobbies.set(lobbyId, lobby);
           client.lobbyId = lobbyId;
 
           sendToClient(ws, {
-            type: "lobbyCreated",
+            type: 'lobbyCreated',
             lobbyId,
             isCreator: true,
-            players: [{ id: client.id, name: client.name }],
+            players: [{ id: client.id, name: client.name }]
           });
           break;
         }
 
-        case "joinLobby": {
+        case 'joinLobby': {
           const client = clients.get(ws);
           if (!client) return;
 
           const lobby = lobbies.get(data.lobbyId);
           if (!lobby) {
-            sendToClient(ws, { type: "joinError", message: "Code ungültig" });
+            sendToClient(ws, { type: 'joinError', message: 'Code ungültig' });
             return;
           }
 
           if (lobby.started) {
-            sendToClient(ws, {
-              type: "joinError",
-              message: "Spiel bereits gestartet",
-            });
+            sendToClient(ws, { type: 'joinError', message: 'Spiel bereits gestartet' });
             return;
           }
 
@@ -159,29 +150,23 @@ function handleWebSocket(ws: WebSocket) {
 
           // Sende Info an neuen Spieler
           sendToClient(ws, {
-            type: "lobbyJoined",
+            type: 'lobbyJoined',
             lobbyId: data.lobbyId,
             isCreator: false,
-            players: lobby.players.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-            })),
-            creator: lobby.creator,
+            players: lobby.players.map((p: Client) => ({ id: p.id, name: p.name })),
+            creator: lobby.creator
           });
 
           // Informiere andere Spieler
           sendToLobby(data.lobbyId, {
-            type: "playerJoined",
+            type: 'playerJoined',
             player: { id: client.id, name: client.name },
-            players: lobby.players.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-            })),
+            players: lobby.players.map((p: Client) => ({ id: p.id, name: p.name }))
           }, ws);
           break;
         }
 
-        case "startGame": {
+        case 'startGame': {
           const client = clients.get(ws);
           if (!client || !client.lobbyId) return;
 
@@ -191,11 +176,11 @@ function handleWebSocket(ws: WebSocket) {
           lobby.started = true;
           lobby.words.clear();
 
-          sendToLobby(client.lobbyId, { type: "gameStarted" });
+          sendToLobby(client.lobbyId, { type: 'gameStarted' });
           break;
         }
 
-        case "submitWord": {
+        case 'submitWord': {
           const client = clients.get(ws);
           if (!client || !client.lobbyId) return;
 
@@ -210,33 +195,28 @@ function handleWebSocket(ws: WebSocket) {
 
           // Informiere alle über den Fortschritt
           sendToLobby(client.lobbyId, {
-            type: "wordSubmitted",
+            type: 'wordSubmitted',
             submittedCount,
-            totalPlayers,
+            totalPlayers
           });
 
           if (submittedCount === totalPlayers) {
             // Alle haben abgegeben - starte Zuordnungsphase
-            const wordsArray = Array.from(lobby.words.entries()).map(
-              (entry) => {
-                const [playerId, word] = entry;
-                return { playerId, word };
-              },
-            );
+            const wordsArray = Array.from(lobby.words.entries()).map((entry) => {
+              const [playerId, word] = entry;
+              return { playerId, word };
+            });
 
             sendToLobby(client.lobbyId, {
-              type: "allWordsSubmitted",
+              type: 'allWordsSubmitted',
               words: wordsArray,
-              players: lobby.players.map((p: any) => ({
-                id: p.id,
-                name: p.name,
-              })),
+              players: lobby.players.map((p: Client) => ({ id: p.id, name: p.name }))
             });
           }
           break;
         }
 
-        case "restartGame": {
+        case 'restartGame': {
           const client = clients.get(ws);
           if (!client || !client.lobbyId) return;
 
@@ -244,12 +224,12 @@ function handleWebSocket(ws: WebSocket) {
           if (!lobby || lobby.creator !== clientId) return;
 
           lobby.words.clear();
-          sendToLobby(client.lobbyId, { type: "gameRestarted" });
+          sendToLobby(client.lobbyId, { type: 'gameRestarted' });
           break;
         }
       }
     } catch (error) {
-      console.error("Error handling message:", error);
+      console.error('Error handling message:', error);
     }
   };
 
@@ -265,18 +245,16 @@ function handleWebSocket(ws: WebSocket) {
 }
 
 // HTTP Handler
-async function handler(req: Request): Promise<Response> {
+function handler(req: Request): Response {
   const url = new URL(req.url);
 
-  // WebSocket Upgrade für /ws Pfad
+  // WICHTIG: WebSocket Upgrade ZUERST prüfen (vor allem anderen!)
   if (url.pathname === "/ws") {
     const upgrade = req.headers.get("upgrade") || "";
     if (upgrade.toLowerCase() !== "websocket") {
-      return new Response("Request isn't trying to upgrade to websocket.", {
-        status: 400,
-      });
+      return new Response("Request isn't trying to upgrade to websocket.", { status: 400 });
     }
-
+    
     const { socket, response } = Deno.upgradeWebSocket(req);
     handleWebSocket(socket);
     return response;
@@ -285,13 +263,19 @@ async function handler(req: Request): Promise<Response> {
   // Serve index.html für root path
   if (url.pathname === "/") {
     try {
-      const html = await Deno.readTextFile("./public/index.html");
+      const html = Deno.readTextFileSync("./public/index.html");
       return new Response(html, {
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: { "content-type": "text/html; charset=utf-8" }
       });
     } catch (error) {
+      console.error("Error reading index.html:", error);
       return new Response("index.html not found", { status: 404 });
     }
+  }
+
+  // Ignoriere favicon.ico Fehler
+  if (url.pathname === "/favicon.ico") {
+    return new Response(null, { status: 204 });
   }
 
   // 404 für alle anderen Pfade
